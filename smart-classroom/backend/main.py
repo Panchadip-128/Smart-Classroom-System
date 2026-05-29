@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from face_engine import recognize
 from attendance_db import save_attendance
@@ -25,6 +26,14 @@ app.add_middleware(
 class AttendanceRequest(BaseModel):
 
     image: str
+
+@app.get("/download")
+def download_csv():
+    return FileResponse(
+        "static/attendance.csv",
+        media_type="text/csv",
+        filename="attendance.csv"
+    )
 
 @app.get("/db")
 def check_db():
