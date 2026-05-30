@@ -17,10 +17,12 @@ app.mount(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://smart-classroom-system-vert.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 class AttendanceRequest(BaseModel):
