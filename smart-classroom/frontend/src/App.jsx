@@ -4,7 +4,7 @@ import axios from "axios";
 function App() {
 
   const API =
-    "https://www.smart-classroom-system-production.up.railway.app";
+  "https://smart-classroom-system-production.up.railway.app";
 
   const videoRef = useRef(null);
 
