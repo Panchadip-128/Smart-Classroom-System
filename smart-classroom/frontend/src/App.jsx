@@ -170,7 +170,7 @@ function App() {
                 padding: "10px 20px", fontSize: "14px", border: "1px solid #38bdf8", borderRadius: "8px",
                 background: "transparent", color: "#38bdf8", cursor: "pointer", fontWeight: "bold", marginTop: "20px"
               }}>
-                📥 Export Official Excel Report
+                Export Official Excel Report
               </button>
             </a>
           </div>
