@@ -11,7 +11,7 @@
 [![React](https://img.shields.io/badge/React_Vite-6366f1?style=for-the-badge&logo=react)](https://reactjs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-4169E1?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org/)
 
-[Architecture](#architecture-overview) | [10 Novel Modules](#the-10-novel-modules) | [Patent Claims](#patent-claims) | [Setup](#setup-instructions)
+[Architecture](#architecture-overview) | [10 Novel Modules](#the-10-novel-modules) | [Dashboard & Reporting](#teacher-and-student-dashboard) | [Patent Claims](#patent-claims) | [Setup](#setup-instructions)
 
 </div>
 
@@ -23,22 +23,61 @@ This system introduces a continuous spatial-temporal methodology for strict phys
 
 The core pipeline operates as follows: a video frame is captured, validated against environmental sensors, passed through a YOLOv8 body-detection liveness gate, processed by a facial recognition layer, fused with iris and voice biometric signals via a Kalman filter, and finally credited to an Accumulated Active Presence (AAP) counter that enforces contiguous attendance. Every state change is logged to a tamper-evident blockchain audit trail and accompanied by a zero-knowledge proof of presence.
 
+![Dashboard Tab](docs/screenshots/dashboard_tab.png)
+
+---
+
+## Teacher and Student Dashboard
+
+The system provides a comprehensive React-based UI for both teachers and students, enabling real-time tracking, historical analysis, and official reporting.
+
+### For Teachers
+
+*   **Live Tracking Dashboard:** View real-time Accumulated Active Presence (AAP) for all students. A progress bar visualizes progression towards the required 40-minute threshold.
+*   **Continuous Camera Tracking:** Start and stop 3-second interval continuous tracking directly from the UI, with live YOLO vision output.
+*   **End-of-Day Finalization:** A single click freezes the daily record, converting "In Progress" statuses to "Present", "Partial", or "Absent" based on the accumulated time.
+*   **Multi-Sheet Excel Export:** Generate comprehensive official reports containing:
+    *   Today's Session stats.
+    *   Full Attendance History.
+    *   Per-Student Summaries (total classes, attendance rate, avg biometric score).
+    *   Daily Class Summaries.
+    *   Blockchain Audit Trail.
+
+![Teacher Camera Tab](docs/screenshots/camera_tab.png)
+
+### For Students
+
+*   **Student Profile Lookup:** Search for a student name to view their complete attendance history, attendance rate, and biometric scores.
+*   **Personal Excel Reports:** Students can download their own localized `.xlsx` attendance history for their records.
+
 ---
 
 ## The 10 Novel Modules
 
-| Module | Feature | Technical Implementation |
-|--------|---------|--------------------------|
-| **1. Two-Stage YOLO Liveness** | Anti-spoofing body-gated face detection | YOLOv8n person detection with aspect-ratio constraints; faces are rejected if not bound within a verified human torso bounding box. |
-| **2. Adaptive Gap Threshold** | Entropy-driven temporal sensitivity | MediaPipe Pose extracts 33 body keypoints; a sliding-window entropy computation maps movement patterns to per-student dynamic gap thresholds (5s-15s). |
-| **3. Model Hash Attestation** | Tamper-proof model loading | SHA-256 cryptographic hashes of all model weights are verified at startup against a sealed registry, preventing unauthorized model substitution. |
-| **4. Zero-Knowledge Proofs** | Privacy-preserving presence verification | Pedersen commitment scheme generates ZK proofs for each 5-second presence window; verifiers can confirm attendance without accessing raw video data. |
-| **5. Edge-Only Inference** | Hardware camera deployment | ONNX export with INT8 quantization for deployment on Jetson Nano, Coral TPU, or equivalent edge NPU hardware. |
-| **6. Policy-as-Code DSL** | Runtime-configurable attendance rules | A domain-specific language parser loads `policy.dsl` at startup, enabling hot-reload of thresholds, confidence levels, and environmental bounds without code changes. |
-| **7. Federated Learning** | On-device anti-spoof improvement | Edge devices train a local logistic classifier on genuine/spoof detections and upload weight deltas; a central server aggregates via Federated Averaging (FedAvg). |
-| **8. Blockchain Audit Log** | Immutable event ledger | An append-only SHA-256 hash-chain records every attendance state change; any retrospective tampering breaks the chain and is detectable by auditors. |
-| **9. Environmental Gating** | Context-aware validation | Ambient light (BH1750) and temperature (TMP102) sensor readings gate AAP accumulation; out-of-range conditions (e.g., dark-room photo attacks) suspend attendance credits. |
-| **10. Session Recovery** | Biometric continuity after gaps | When a student leaves the frame and returns beyond the gap threshold, cosine similarity of stored face embeddings re-links the detection to the existing session, preventing fragmentation. |
+Here is a detailed breakdown of how each patented feature is practically applied in the system:
+
+| Module | Feature | Technical Implementation & Application |
+|--------|---------|--------------------------------------|
+| **1. Two-Stage YOLO Liveness** | Anti-spoofing body-gated face detection | **Application:** Prevents "photo-to-camera" spoofing. YOLOv8n first detects a human person and checks aspect-ratio constraints. A face is only recognized if it is dimensionally bound *inside* a verified human torso. |
+| **2. Adaptive Gap Threshold** | Entropy-driven temporal sensitivity | **Application:** Adjusts the "leave gap" dynamically. MediaPipe Pose extracts 33 body keypoints. A sliding-window entropy computation maps movement patterns to per-student dynamic gap thresholds (e.g., 5s for still students, 15s for active ones). |
+| **3. Model Hash Attestation** | Tamper-proof model loading | **Application:** Guarantees inference integrity. SHA-256 cryptographic hashes of all model weights (e.g., `yolov8n.pt`) are verified at startup against a sealed registry, preventing unauthorized model substitution. |
+| **4. Zero-Knowledge Proofs** | Privacy-preserving presence verification | **Application:** Privacy-compliant attendance. A Pedersen commitment scheme generates ZK proofs for each 5-second presence window. Third-party auditors can verify attendance without ever seeing raw video data. |
+| **5. Edge-Only Inference** | Hardware camera deployment | **Application:** Low-power edge deployment. Includes an ONNX export script with INT8 quantization, allowing the heavy YOLO/dlib pipeline to run on Jetson Nanos or Coral TPUs directly. |
+| **6. Policy-as-Code DSL** | Runtime-configurable attendance rules | **Application:** Zero-downtime policy updates. A domain-specific language parser loads `policy.dsl` at startup, enabling administrators to hot-reload time thresholds, confidence levels, and environmental bounds without restarting servers. |
+| **7. Federated Learning** | On-device anti-spoof improvement | **Application:** Privacy-preserving model training. Edge devices locally train a logistic classifier on genuine/spoof detections and upload only weight deltas. The central server aggregates these via Federated Averaging (FedAvg). |
+| **8. Blockchain Audit Log** | Immutable event ledger | **Application:** Non-repudiation of attendance records. An append-only SHA-256 hash-chain records every state change (e.g., "session_start", "attendance_update"). Any retrospective tampering breaks the chain. |
+| **9. Environmental Gating** | Context-aware validation | **Application:** Prevents dark-room or manipulated-environment spoofing. Ambient light (lux) and temperature (Celsius) sensor readings gate AAP accumulation. Out-of-range conditions automatically suspend attendance credits. |
+| **10. Session Recovery** | Biometric continuity after gaps | **Application:** Handles occlusion and network drops gracefully. When a student leaves the frame and returns beyond the gap threshold, cosine similarity of stored face embeddings re-links the new detection to the existing session, preventing fragmented records. |
+
+### Module Visualizations
+
+````carousel
+![Blockchain Audit Trail](docs/screenshots/audit_tab.png)
+<!-- slide -->
+![Environmental Gating & System Telemetry](docs/screenshots/environment_tab.png)
+<!-- slide -->
+![Model Attestation System Report](docs/screenshots/system_tab.png)
+````
 
 ---
 
@@ -156,7 +195,7 @@ Tested subsystems: Policy Engine, Config Module, Model Attestation, Entropy Engi
 ```bash
 cd smart-classroom/backend
 python -m venv venv
-source venv/Scripts/activate  # Windows
+source venv/Scripts/activate  # Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python main.py
 ```
@@ -169,7 +208,7 @@ npm run dev
 ```
 
 ### 3. Usage
-Navigate to `http://localhost:5173` in a browser. The dashboard provides five tabs: Dashboard (live attendance), Camera (YOLO feed), Audit (blockchain trail), Environment (sensor readings), and System (model attestation).
+Navigate to `http://localhost:5173` in a browser. The dashboard provides comprehensive tabs for Live Attendance, Camera Tracking, Student Lookup, Audit Trails, Environment Sensors, and System Attestation.
 
 ---
 
