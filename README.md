@@ -24,7 +24,49 @@ This system introduces a continuous spatial-temporal methodology for strict phys
 
 The core pipeline operates asynchronously using ThreadPool concurrency: a video frame is captured, validated against environmental sensors, passed through a YOLOv8 body-detection liveness gate, processed by a facial recognition layer, fused with iris and voice biometric signals via a Kalman filter, and finally credited to an Accumulated Active Presence (AAP) counter. Every state change is logged to a tamper-evident blockchain audit trail and accompanied by a zero-knowledge proof.
 
-![Dashboard Tab](docs/screenshots/dashboard_tab.png)
+## Local Setup Instructions
+
+### 1. Backend Setup
+```bash
+cd smart-classroom/backend
+python -m venv venv
+source venv/Scripts/activate  # Windows: .\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python main.py
+```
+
+### 2. Frontend Setup
+```bash
+cd smart-classroom/frontend
+npm install
+npm run dev
+```
+
+### 3. Usage
+Navigate to `http://localhost:5173` in a browser.
+
+---
+
+## Production Deployment Guide (Vercel + Cloud Docker)
+
+Because the continuous vision engine requires heavy native C++ dependencies (`libgl1-mesa-glx`, `cmake`, `dlib`) and significant RAM for YOLOv8 inference, it is architected for a split deployment.
+
+### 1. Deploy Frontend (Vercel)
+The React/Vite frontend is pre-configured with a `vercel.json` for React Router and utilizes environment variables for dynamic API mapping.
+1. Create a project in Vercel and link your GitHub repository.
+2. Set the Root Directory to `smart-classroom/frontend`.
+3. Under Environment Variables, add:
+   * `VITE_API_URL` = `https://your-backend.onrender.com`
+   * `VITE_WS_URL` = `wss://your-backend.onrender.com/ws/dashboard`
+4. Click **Deploy**.
+
+### 2. Deploy Backend (Render / Railway / AWS ECS)
+The backend includes a highly optimized Ubuntu-based `Dockerfile` that automatically handles the C++ toolchains and AI model compilations.
+1. Connect your repository to a PaaS like Render (Web Service) or Railway.
+2. Select **Docker** as the runtime environment.
+3. Set the Root Directory to `smart-classroom/backend`.
+4. Ensure the instance has at least **1GB - 2GB RAM** to handle YOLO inference without out-of-memory (OOM) errors.
+5. Deploy. The FastAPI server will automatically expose port `8000` via Uvicorn.
 
 ---
 

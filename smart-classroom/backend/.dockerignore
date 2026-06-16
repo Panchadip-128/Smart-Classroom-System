@@ -1,0 +1,22 @@
+# Ignore virtual environments
+venv/
+.venv/
+env/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore local PyTorch models if you want to pull ONNX exclusively at runtime 
+# (Commented out if you want to package the model inside the container)
+# yolov8n.pt
+
+# Ignore IDE files
+.vscode/
+.idea/
