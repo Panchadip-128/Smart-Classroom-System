@@ -69,16 +69,102 @@ The backend includes a highly optimized Ubuntu-based `Dockerfile` that automatic
 5. Deploy. The FastAPI server will automatically expose port `8000` via Uvicorn.
 
 ### 3. Hardware Deployment Topologies (24x7x365 Operations)
-Because this system is engineered for continuous 24x7 operation across a large university campus rather than a standalone student project, the hardware rollout is highly flexible to accommodate university firewalls. The platform supports three primary hardware topologies:
+Because this system is engineered for continuous 24x7 operation across a large university campus rather than a standalone student project, the hardware rollout is highly flexible to accommodate university firewalls. The platform supports three primary hardware architectures:
 
-**Topology A: Centralized NVR IT Server (Recommended for Campuses)**
+#### Topology A: Centralized NVR IT Server (Recommended for Campuses)
 Instead of installing hardware in every room, all classroom CCTV RTSP feeds are routed back to the university's centralized IT server room. A single, powerful instance of the `cctv_edge_client.py` runs on the central server, concurrently ingesting all 50+ classroom streams, processing the frames, and securely transmitting the biometrics over HTTPS to the Render backend.
 
-**Topology B: Direct VPN / VPC Tunnel**
+```mermaid
+graph LR
+    subgraph Classrooms ["Physical Classrooms"]
+        C1["CCTV Camera 1"]
+        C2["CCTV Camera 2"]
+        CN["CCTV Camera 50+"]
+    end
+
+    subgraph IT ["Central University IT Room"]
+        NVR["Central NVR Switch"]
+        Edge["Central Edge Server<br>(cctv_edge_client.py)"]
+    end
+
+    subgraph Cloud ["Render Cloud Backend"]
+        API["FastAPI Security Gateway"]
+        DB[("Biometric Database")]
+    end
+
+    C1 -- "RTSP Stream" --> NVR
+    C2 -- "RTSP Stream" --> NVR
+    CN -- "RTSP Stream" --> NVR
+    NVR -- "50x Concurrent Streams" --> Edge
+    Edge -- "HTTPS / API Key<br>Extracted Frames" --> API
+    API --> DB
+    
+    style Classrooms fill:#1e1b4b,stroke:#6366f1,color:#e0e7ff
+    style IT fill:#064e3b,stroke:#10b981,color:#d1fae5
+    style Cloud fill:#7f1d1d,stroke:#f87171,color:#fee2e2
+```
+
+#### Topology B: Direct VPN / VPC Tunnel
 If the university IT department provisions a secure Site-to-Site VPN or IP Whitelist, the Render Cloud backend can bypass the university firewall directly. The cloud engine connects natively to `rtsp://<internal-camera-ip>` without any intermediary hardware.
 
-**Topology C: Local Classroom Edge Gateways**
-For decentralized networks, a low-cost Edge Node (e.g., Raspberry Pi 5, Intel NUC) is installed in the AV rack of each physical classroom. It runs the Edge Client as a resilient `systemd` service, silently bridging the gap between the local CCTV camera and the external cloud API.
+```mermaid
+graph LR
+    subgraph Classrooms ["Physical Classrooms"]
+        C1["CCTV Camera 1"]
+        CN["CCTV Camera N"]
+    end
+
+    subgraph Security ["University Firewall"]
+        VPN["Site-to-Site VPN / IP Whitelist"]
+    end
+
+    subgraph Cloud ["Render Cloud Backend"]
+        API["FastAPI Engine"]
+        Vision["Native Inference Engine"]
+        DB[("Biometric Database")]
+    end
+
+    C1 -- "Local RTSP Stream" --> VPN
+    CN -- "Local RTSP Stream" --> VPN
+    VPN -- "Secure IPSEC Tunnel" --> Vision
+    Vision --> API
+    API --> DB
+
+    style Classrooms fill:#1e1b4b,stroke:#6366f1,color:#e0e7ff
+    style Security fill:#1c1917,stroke:#f59e0b,color:#fef3c7
+    style Cloud fill:#7f1d1d,stroke:#f87171,color:#fee2e2
+```
+
+#### Topology C: Local Classroom Edge Gateways
+For decentralized networks (or older buildings without centralized IT wiring), a low-cost Edge Node (e.g., Raspberry Pi 5, Intel NUC) is installed in the AV rack of each physical classroom. It runs the Edge Client as a resilient `systemd` service, silently bridging the gap between the local CCTV camera and the external cloud API.
+
+```mermaid
+graph LR
+    subgraph Room1 ["Classroom 1"]
+        C1["CCTV Camera"]
+        E1["Raspberry Pi / Jetson<br>Edge Client"]
+    end
+
+    subgraph RoomN ["Classroom N"]
+        CN["CCTV Camera"]
+        EN["Raspberry Pi / Jetson<br>Edge Client"]
+    end
+
+    subgraph Cloud ["Render Cloud Backend"]
+        API["FastAPI Security Gateway"]
+        DB[("Biometric Database")]
+    end
+
+    C1 -- "Local RTSP" --> E1
+    CN -- "Local RTSP" --> EN
+    E1 -- "HTTPS / API Key<br>Frames" --> API
+    EN -- "HTTPS / API Key<br>Frames" --> API
+    API --> DB
+
+    style Room1 fill:#1e1b4b,stroke:#6366f1,color:#e0e7ff
+    style RoomN fill:#1e1b4b,stroke:#6366f1,color:#e0e7ff
+    style Cloud fill:#7f1d1d,stroke:#f87171,color:#fee2e2
+```
 
 ---
 
