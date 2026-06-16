@@ -68,6 +68,18 @@ The backend includes a highly optimized Ubuntu-based `Dockerfile` that automatic
 4. Ensure the instance has at least **1GB - 2GB RAM** to handle YOLO inference without out-of-memory (OOM) errors.
 5. Deploy. The FastAPI server will automatically expose port `8000` via Uvicorn.
 
+### 3. Hardware Deployment Topologies (24x7x365 Operations)
+Because this system is engineered for continuous 24x7 operation across a large university campus rather than a standalone student project, the hardware rollout is highly flexible to accommodate university firewalls. The platform supports three primary hardware topologies:
+
+**Topology A: Centralized NVR IT Server (Recommended for Campuses)**
+Instead of installing hardware in every room, all classroom CCTV RTSP feeds are routed back to the university's centralized IT server room. A single, powerful instance of the `cctv_edge_client.py` runs on the central server, concurrently ingesting all 50+ classroom streams, processing the frames, and securely transmitting the biometrics over HTTPS to the Render backend.
+
+**Topology B: Direct VPN / VPC Tunnel**
+If the university IT department provisions a secure Site-to-Site VPN or IP Whitelist, the Render Cloud backend can bypass the university firewall directly. The cloud engine connects natively to `rtsp://<internal-camera-ip>` without any intermediary hardware.
+
+**Topology C: Local Classroom Edge Gateways**
+For decentralized networks, a low-cost Edge Node (e.g., Raspberry Pi 5, Intel NUC) is installed in the AV rack of each physical classroom. It runs the Edge Client as a resilient `systemd` service, silently bridging the gap between the local CCTV camera and the external cloud API.
+
 ---
 
 ## Enterprise Dashboard & Reporting
