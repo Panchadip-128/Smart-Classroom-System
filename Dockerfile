@@ -16,6 +16,10 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first to leverage Docker cache
 COPY smart-classroom/backend/requirements.txt .
 
+# Limit C++ compilation concurrency to prevent 8GB+ OOM crashes on Render
+ENV CMAKE_BUILD_PARALLEL_LEVEL=1
+ENV MAX_JOBS=1
+
 # Install Python dependencies (this will compile dlib and install onnxruntime)
 RUN pip install --no-cache-dir -r requirements.txt
 
