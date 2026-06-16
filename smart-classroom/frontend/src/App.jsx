@@ -434,9 +434,14 @@ function App() {
         {activeTab === "camera" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col transition-colors">
-              <div className="px-4 py-5 border-b border-slate-200 dark:border-slate-700 sm:px-6">
-                <h3 className="text-base font-semibold leading-6 text-slate-900 dark:text-white">Classroom Camera Feed</h3>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Raw capture stream for edge inference</p>
+              <div className="px-4 py-5 border-b border-slate-200 dark:border-slate-700 sm:px-6 flex justify-between items-center">
+                <div>
+                  <h3 className="text-base font-semibold leading-6 text-slate-900 dark:text-white">Local Camera Feed</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Raw capture stream for fallback edge inference</p>
+                </div>
+                <span className="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-400 ring-1 ring-inset ring-indigo-600/20 dark:ring-indigo-500/20">
+                  Local Mode Active
+                </span>
               </div>
               <div className="p-4 flex-1">
                 <video ref={videoRef} autoPlay playsInline muted className="w-full h-auto rounded-lg bg-slate-900 border border-slate-200 dark:border-slate-700 object-cover aspect-video" />
@@ -467,6 +472,9 @@ function App() {
                     </>
                   )}
                 </button>
+                <div className="mt-3 text-xs text-center text-slate-500 dark:text-slate-400">
+                  <strong>Note:</strong> If the Edge CCTV Gateway is running remotely, you do not need to initialize local tracking.
+                </div>
               </div>
             </div>
 

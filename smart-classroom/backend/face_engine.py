@@ -51,11 +51,10 @@ def enroll_student(name, image_path):
     print("Added:", name, image_path)
     return True
 
-def resize_for_edge(image, max_width=640):
+def resize_for_edge(image, max_width=1920):
     """
-    OPTIMIZATION 2: Aggressive frame downscaling.
-    Processing 1080p frames is too slow for edge devices.
-    Downscaling to 640px max width provides non-linear speedups.
+    OPTIMIZATION 2: Adaptive High-Res Frame Downscaling.
+    Supports high-res 1080p CCTV feeds while preventing 4K+ memory explosions.
     """
     h, w = image.shape[:2]
     if w > max_width:
@@ -80,8 +79,8 @@ def recognize(base64_image):
         if image is None:
             return []
             
-        # Apply Edge Optimization 2: Downscaling
-        image = resize_for_edge(image, max_width=640)
+        # Apply Edge Optimization 2: Downscaling (Increased to 1080p for CCTV)
+        image = resize_for_edge(image, max_width=1920)
 
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
