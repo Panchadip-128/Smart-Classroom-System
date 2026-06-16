@@ -6,6 +6,7 @@ import numpy as np
 import base64
 import torch
 from ultralytics import YOLO
+from cryptography.fernet import Fernet
 
 # Fix for PyTorch 2.6 weights_only unpickling error
 _original_load = torch.load
@@ -17,6 +18,10 @@ torch.load = _custom_load
 DATA_DIR = os.getenv("DATA_DIR", "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 ENCODING_FILE = os.path.join(DATA_DIR, "encodings.pkl")
+
+# Generate or load the 256-bit AES key
+ENCRYPTION_KEY = os.getenv("BIO_ENCRYPTION_KEY", Fernet.generate_key().decode())
+fernet = Fernet(ENCRYPTION_KEY.encode())
 
 # OPTIMIZATION 1: Load ONNX model for edge inference
 # ONNX is significantly lighter on CPU/RAM than PyTorch.
@@ -32,12 +37,27 @@ else:
 def load_encodings():
     if os.path.exists(ENCODING_FILE):
         with open(ENCODING_FILE, "rb") as f:
-            return pickle.load(f)
+            data = f.read()
+        try:
+            decrypted_data = fernet.decrypt(data)
+            return pickle.loads(decrypted_data)
+        except Exception:
+            try:
+                # Migration: File exists but is not encrypted. Load it and auto-encrypt it.
+                unencrypted = pickle.loads(data)
+                save_encodings(unencrypted)
+                print("Auto-migrated legacy unencrypted biometric database to AES-256.")
+                return unencrypted
+            except Exception as e:
+                print(f"Failed to load biometric database: {e}")
+                return {}
     return {}
 
 def save_encodings(data):
+    binary_data = pickle.dumps(data)
+    encrypted_data = fernet.encrypt(binary_data)
     with open(ENCODING_FILE, "wb") as f:
-        pickle.dump(data, f)
+        f.write(encrypted_data)
 
 def enroll_student(name, image_path=None, base64_image=None):
     if base64_image:

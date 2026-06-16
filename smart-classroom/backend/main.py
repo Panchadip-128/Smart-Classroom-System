@@ -7,9 +7,12 @@ EDGE OPTIMIZED: Implements ThreadPoolExecutor for heavy CV tasks
 to ensure the async event loop (and WebSockets) remain unblocked.
 """
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Security
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends, HTTPException, Security, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -52,18 +55,27 @@ DATA_DIR = os.getenv("DATA_DIR", "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 ENCODING_FILE = os.path.join(DATA_DIR, "encodings.pkl")
 
+# --- Rate Limiter ---
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="CSTPE - Continuous Spatial-Temporal Presence Engine",
     description="Patent-pending attendance system with 10 novel features",
     version="2.0.0",
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="."), name="static")
 
+# --- Strict CORS Hardening ---
+# Only allow configured origins (e.g., the official Vercel dashboard)
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -206,7 +218,8 @@ def _cv_pipeline_worker(image_data):
 
 
 @app.post("/attendance", dependencies=[Depends(get_api_key)])
-async def attendance(request: AttendanceRequest):
+@limiter.limit("60/minute")
+async def attendance(request: Request, data: AttendanceRequest):
     """
     Main attendance endpoint. SECURED.
     Runs the full CSTPE pipeline across all 10 modules asynchronously.
@@ -215,7 +228,7 @@ async def attendance(request: AttendanceRequest):
     
     # Run the heavy CV pipeline in the threadpool
     students, stats, env_data = await loop.run_in_executor(
-        cv_thread_pool, _cv_pipeline_worker, request.image
+        cv_thread_pool, _cv_pipeline_worker, data.image
     )
 
     # 7. Broadcast to teacher dashboard
@@ -234,21 +247,23 @@ async def attendance(request: AttendanceRequest):
 
 
 @app.post("/recognize", dependencies=[Depends(get_api_key)])
-async def recognize_students(request: AttendanceRequest):
+@limiter.limit("60/minute")
+async def recognize_students(request: Request, data: AttendanceRequest):
     loop = asyncio.get_event_loop()
-    students = await loop.run_in_executor(cv_thread_pool, recognize, request.image)
+    students = await loop.run_in_executor(cv_thread_pool, recognize, data.image)
     return {"students": students}
 
 
 @app.post("/enroll", dependencies=[Depends(get_api_key)])
-def enroll(request: EnrollRequest):
+@limiter.limit("10/minute")
+def enroll(request: Request, data: EnrollRequest):
     """
     Secure Student Enrollment endpoint.
     Takes a base64 image and student name, runs face_encodings, and saves to persistent data.
     """
-    success = enroll_student(request.student_name, base64_image=request.image)
+    success = enroll_student(data.student_name, base64_image=data.image)
     if success:
-        return {"status": "success", "message": f"Successfully enrolled {request.student_name} into the biometric database."}
+        return {"status": "success", "message": f"Successfully enrolled {data.student_name} into the biometric database."}
     return {"status": "error", "message": "No face detected or enrollment failed. Ensure the student is looking directly at the camera."}
 
 
@@ -283,7 +298,8 @@ def teacher_history(date: str = Query(None)):
 
 
 @app.post("/teacher/finalize", dependencies=[Depends(get_api_key)])
-def teacher_finalize_day(class_name: str = Query("General")):
+@limiter.limit("5/minute")
+def teacher_finalize_day(request: Request, class_name: str = Query("General")):
     """
     End-of-day finalization.
     Marks 'In Progress' students as Present/Partial/Absent,
