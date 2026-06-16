@@ -2,6 +2,7 @@
 venv/
 .venv/
 env/
+smart-classroom/backend/venv/
 
 # Ignore Python cache
 __pycache__/
@@ -9,12 +10,15 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Ignore Node
+node_modules/
+dist/
+
 # Ignore git
 .git/
 .gitignore
 
 # Ignore local PyTorch models if you want to pull ONNX exclusively at runtime 
-# (Commented out if you want to package the model inside the container)
 # yolov8n.pt
 
 # Ignore IDE files

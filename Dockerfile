@@ -14,13 +14,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
-COPY requirements.txt .
+COPY smart-classroom/backend/requirements.txt .
 
 # Install Python dependencies (this will compile dlib and install onnxruntime)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source code
-COPY . .
+COPY smart-classroom/backend/ .
 
 # Expose the port FastAPI runs on
 EXPOSE 8000
