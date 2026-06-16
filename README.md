@@ -313,8 +313,16 @@ graph TB
 
 A critical requirement for university deployment is strict adherence to student data privacy laws (FERPA in the US, GDPR in Europe). The CSTPE architecture enforces privacy by design:
 1. **No Raw Image Retention:** The edge gateways and cloud backend **never save raw images** of students. Video frames are held in volatile RAM for milliseconds, converted into irreversible 128-dimensional numerical vectors (embeddings), and immediately discarded.
-2. **Cryptographic Storage:** The `encodings.pkl` database only stores mathematical vectors. Even if the database is breached, it is impossible to reverse-engineer a student's face from the numerical hash.
+2. **AES-256 Cryptographic Storage:** The `encodings.pkl` database only stores mathematical vectors that are fundamentally encrypted at rest using AES-256 (`cryptography.fernet`). Even if the physical server is stolen, it is impossible to read or reverse-engineer a student's face.
 3. **Zero-Knowledge Proofs:** Attendance reports generated for the university registrar use ZK-Pedersen commitments, proving a student was present for the required duration without exposing the granular, second-by-second tracking logs.
+
+---
+
+## DDoS & Network Hardening
+
+To ensure the system remains highly available and impenetrable to outside attacks:
+1. **SlowAPI Rate Limiting:** All endpoints are mathematically throttled to prevent brute-force and DDoS attacks (e.g., the biometric enrollment API is hard-limited to 10 requests/minute per IP).
+2. **Strict CORS Verification:** The backend explicitly rejects network traffic from random origins or external scripts, restricting API access exclusively to the official university dashboard URL.
 
 ---
 
