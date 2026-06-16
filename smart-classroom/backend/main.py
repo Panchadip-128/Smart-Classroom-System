@@ -2,11 +2,16 @@
 CSTPE Main Server - Integrated Orchestration
 FastAPI backend with all 10 patent-ready modules plus
 comprehensive teacher/student attendance management endpoints.
+
+EDGE OPTIMIZED: Implements ThreadPoolExecutor for heavy CV tasks
+to ensure the async event loop (and WebSockets) remain unblocked.
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
@@ -55,8 +60,11 @@ app.add_middleware(
 async def startup_attestation():
     if is_feature_enabled("model_attestation"):
         models_to_verify = {}
-        if os.path.exists("yolov8n.pt"):
+        if os.path.exists("exports/yolov8n.onnx"):
+            models_to_verify["yolov8n"] = "exports/yolov8n.onnx"
+        elif os.path.exists("yolov8n.pt"):
             models_to_verify["yolov8n"] = "yolov8n.pt"
+            
         if os.path.exists("encodings.pkl"):
             models_to_verify["face_encodings"] = "encodings.pkl"
 
@@ -98,6 +106,8 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# EDGE OPTIMIZATION: Dedicated ThreadPool for heavy CPU-bound CV tasks
+cv_thread_pool = ThreadPoolExecutor(max_workers=4)
 
 # =============================================
 # CORE ENDPOINTS
@@ -123,11 +133,9 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-@app.post("/attendance")
-async def attendance(request: AttendanceRequest):
+def _cv_pipeline_worker(image_data):
     """
-    Main attendance endpoint.
-    Runs the full CSTPE pipeline across all 10 modules.
+    Runs entirely in a background thread to prevent event loop blocking.
     """
     # 1. Environmental check (Feature 9)
     env_valid = True
@@ -135,8 +143,8 @@ async def attendance(request: AttendanceRequest):
     if is_feature_enabled("environmental_gating"):
         env_valid, env_data, violations = env_sensors.check_environment()
 
-    # 2. YOLO + Face Recognition
-    students = recognize(request.image)
+    # 2. YOLO + Face Recognition (Edge optimized ONNX / resizing)
+    students = recognize(image_data)
 
     # 3. Multi-modal biometric fusion (Feature 1)
     metadata = {}
@@ -172,6 +180,22 @@ async def attendance(request: AttendanceRequest):
 
     # 6. Update AAP database
     stats = update_attendance(students, metadata=metadata)
+    
+    return students, stats, env_data
+
+
+@app.post("/attendance")
+async def attendance(request: AttendanceRequest):
+    """
+    Main attendance endpoint.
+    Runs the full CSTPE pipeline across all 10 modules asynchronously.
+    """
+    loop = asyncio.get_event_loop()
+    
+    # Run the heavy CV pipeline in the threadpool
+    students, stats, env_data = await loop.run_in_executor(
+        cv_thread_pool, _cv_pipeline_worker, request.image
+    )
 
     # 7. Broadcast to teacher dashboard
     await manager.broadcast({
@@ -190,7 +214,8 @@ async def attendance(request: AttendanceRequest):
 
 @app.post("/recognize")
 async def recognize_students(request: AttendanceRequest):
-    students = recognize(request.image)
+    loop = asyncio.get_event_loop()
+    students = await loop.run_in_executor(cv_thread_pool, recognize, request.image)
     return {"students": students}
 
 
@@ -335,8 +360,11 @@ def get_environment():
 @app.get("/attestation")
 def get_attestation():
     models = {}
-    if os.path.exists("yolov8n.pt"):
+    if os.path.exists("exports/yolov8n.onnx"):
+        models["yolov8n_onnx"] = "exports/yolov8n.onnx"
+    elif os.path.exists("yolov8n.pt"):
         models["yolov8n"] = "yolov8n.pt"
+        
     if os.path.exists("encodings.pkl"):
         models["face_encodings"] = "encodings.pkl"
     return verify_all_models(models)

@@ -7,7 +7,7 @@ import base64
 import torch
 from ultralytics import YOLO
 
-# Fix for PyTorch 2.6 weights_only unpickling error with older ultralytics
+# Fix for PyTorch 2.6 weights_only unpickling error
 _original_load = torch.load
 def _custom_load(*args, **kwargs):
     kwargs['weights_only'] = False
@@ -16,9 +16,16 @@ torch.load = _custom_load
 
 ENCODING_FILE = "encodings.pkl"
 
-# Load YOLO model for person detection (anti-spoofing)
-# It will download yolov8n.pt automatically on first run
-yolo_model = YOLO("yolov8n.pt")
+# OPTIMIZATION 1: Load ONNX model for edge inference
+# ONNX is significantly lighter on CPU/RAM than PyTorch.
+ONNX_MODEL_PATH = "exports/yolov8n.onnx"
+if os.path.exists(ONNX_MODEL_PATH):
+    yolo_model = YOLO(ONNX_MODEL_PATH, task="detect")
+    print("Loaded YOLOv8 ONNX format for Edge Inference.")
+else:
+    # Fallback to PyTorch if ONNX export hasn't run yet
+    yolo_model = YOLO("yolov8n.pt")
+    print("Loaded YOLOv8 PyTorch format.")
 
 def load_encodings():
     if os.path.exists(ENCODING_FILE):
@@ -44,12 +51,23 @@ def enroll_student(name, image_path):
     print("Added:", name, image_path)
     return True
 
+def resize_for_edge(image, max_width=640):
+    """
+    OPTIMIZATION 2: Aggressive frame downscaling.
+    Processing 1080p frames is too slow for edge devices.
+    Downscaling to 640px max width provides non-linear speedups.
+    """
+    h, w = image.shape[:2]
+    if w > max_width:
+        ratio = max_width / w
+        new_h = int(h * ratio)
+        return cv2.resize(image, (max_width, new_h), interpolation=cv2.INTER_AREA)
+    return image
+
 def recognize(base64_image):
     try:
-        print("START RECOGNITION WITH YOLO + LIVENESS")
         db = load_encodings()
         if len(db) == 0:
-            print("Database empty")
             return []
 
         if "," in base64_image:
@@ -60,13 +78,16 @@ def recognize(base64_image):
         image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
 
         if image is None:
-            print("Image decode failed")
             return []
+            
+        # Apply Edge Optimization 2: Downscaling
+        image = resize_for_edge(image, max_width=640)
 
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # 1. Advanced YOLO Detection for Body/Context (Anti-Spoofing)
-        results = yolo_model(image)
+        # Using imgsz=640 optimizes ONNX inference further
+        results = yolo_model(image, imgsz=640, verbose=False)
         persons = []
         for r in results:
             for box in r.boxes:
@@ -79,7 +100,16 @@ def recognize(base64_image):
                     if h > w * 0.8: # Person isn't a horizontal 2D floating cutout
                         persons.append((x1, y1, x2, y2))
 
+        # OPTIMIZATION 3: Fast-Fail
+        # If YOLO found no humans, don't run heavy dlib face extraction
+        if len(persons) == 0:
+            # We still save the image so the dashboard doesn't look frozen
+            os.makedirs("static", exist_ok=True)
+            cv2.imwrite("static/result.jpg", image)
+            return []
+
         # 2. Face Detection
+        # Only reached if YOLO found a person
         face_locations = face_recognition.face_locations(image_rgb, model="hog")
         face_encs = face_recognition.face_encodings(image_rgb, face_locations, num_jitters=1)
 
@@ -97,9 +127,7 @@ def recognize(base64_image):
                     break
             
             if not is_real_person:
-                print("Spoof detected: Face found but no corresponding YOLO person body.")
-                # We can skip or mark as spoof
-                # For now, we skip marking attendance for floating faces
+                # Floating face detected (spoof)
                 continue
 
             best_name = None
@@ -119,7 +147,6 @@ def recognize(base64_image):
                 label = best_name
                 detected.append(best_name)
                 used_students.add(best_name)
-                print("Matched:", best_name, best_distance)
             else:
                 label = "Unknown"
                 detected.append(label)
