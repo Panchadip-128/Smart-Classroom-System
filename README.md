@@ -50,7 +50,7 @@ Designed for university registrars, the system generates comprehensive official 
 
 ---
 
-## The 10 Novel Modules
+## Novel Modules
 
 Here is a detailed visual breakdown of how each patented feature is practically applied in the system:
 
